@@ -2,8 +2,9 @@ package oauth
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/abhilashdk2016/bookstore_oauth_go/oauth/errors"
+	"github.com/abhilashdk2016/bookstore_utils_go/rest_errors"
 	"github.com/mercadolibre/golang-restclient/rest"
 	"net/http"
 	"strconv"
@@ -63,23 +64,23 @@ func GetClientId(request *http.Request) int64 {
 	return clientId
 }
 
-func getAccessToken(accessTokenId string) (*accessToken, *errors.RestErr) {
+func getAccessToken(accessTokenId string) (*accessToken, rest_errors.RestErr) {
 	response := oauthRestClient.Get(fmt.Sprintf("/oauth/access_token/%s", accessTokenId))
 	if response == nil || response.Response == nil {
-		return nil, errors.NewInternalServerError("Invalid rest client response while trying to get access token")
+		return nil, rest_errors.NewInternalServerError("Invalid rest client response while trying to get access token", errors.New(""))
 	}
 
 	if response.StatusCode > 299 {
-		var restErr errors.RestErr
+		var restErr rest_errors.RestErr
 		err := json.Unmarshal(response.Bytes(), &restErr)
 		if err != nil {
-			return nil, errors.NewInternalServerError("Invalid error interface when tyring to get access token")
+			return nil, rest_errors.NewInternalServerError("Invalid error interface when tyring to get access token", errors.New(""))
 		}
-		return nil, &restErr
+		return nil, restErr
 	}
 	var newAt accessToken
 	if err := json.Unmarshal(response.Bytes(), &newAt); err != nil {
-		return nil, errors.NewInternalServerError("Error when trying to unmarshal access token response")
+		return nil, rest_errors.NewInternalServerError("Error when trying to unmarshal access token response", errors.New(""))
 	}
 	return &newAt, nil
 }
@@ -92,7 +93,7 @@ func cleanRequest(request *http.Request) {
 	request.Header.Del(headerXCallerId)
 }
 
-func AuthenticateRequest(request *http.Request) *errors.RestErr{
+func AuthenticateRequest(request *http.Request) rest_errors.RestErr{
 	if request == nil {
 		return nil
 	}
@@ -105,7 +106,7 @@ func AuthenticateRequest(request *http.Request) *errors.RestErr{
 
 	at, err := getAccessToken(accessTokenId)
 	if err != nil {
-        if err.Status == http.StatusNotFound {
+        if err.Status() == http.StatusNotFound {
 			return nil
 		}
 		return err
